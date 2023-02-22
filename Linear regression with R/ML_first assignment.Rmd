@@ -1,0 +1,239 @@
+---
+title: "machine_learning"
+output:
+  html_document: default
+  pdf_document: default
+date: "2023-01-07"
+---
+
+#### 1.[5 pts] Write code that produces a 10,000 x 1001 matrix (rows x cols) of random numbers drawn from N(0,1). Seed your code using the last 4 digits of your phone number (this number will be different for everyone). Every time you run the code, it should now yield the exact same ("random") dataset.
+
+```{r}
+library(dplyr)
+
+### fix seed for the random number generator
+set.seed(2893)
+
+### assign randomly generated number from normally distributed data to fill a 10000X1001 matrix m
+m <- matrix(data = rnorm(10000*1001)  , nrow= 10000 , ncol = 1001) 
+```
+
+#### 2.Treat the first column as "y" and the remaining 1000 columns as x's.
+
+```{r}
+### assign first column to y
+y <- m[,1]
+
+### assign rest of the columns to X's
+x <- m[,2:1001]
+```
+
+#### 3. Regress y on x's. Is an intercept needed? Why? Why not?
+
+```{r}
+regression <- lm(y~x[,1:1000]-1)
+```
+
+I think there shouldn't be an intercept, because both Xs and Ys are generated from N~(0,1), since that regression line always go through x bar and y bar (0 , 0), the regression line is not going to have an intercept.
+
+
+#### 4. Create a histogram of the p-values from the regression in Q3. What distribution does this histogram look like?
+
+```{r}
+regression_P_values <- summary(regression)$coefficient[,4]
+hist(regression_P_values,
+     breaks = seq(0 , 1 , 0.05),
+     xlab = "p_value")
+```
+
+#### 5. How many "significant" variables do you expect to find knowing how the data was generated? How many "significant" variables does the regression yield if alpha = 0.01? What does this tell us?
+
+I think we are expecting to see
+
+1000 X 0.01 = 10
+
+significant variables, the reason is that given the way the Xs are being generated, there should not be able to predict Y values, given that we are using 1% significant level, there's 1% possibility that we erroneously identify the underlying variable as significant, as there are totally 1000 variables, we multiply 1% by 1000, which gives us 10.
+
+```{r}
+### turn P-value matrix into vector
+p_value_vector <- as.vector(regression_P_values)
+
+### return numbers of p-values that are smaller than 0.01 (significant under 1% significant level)
+length(p_value_vector[p_value_vector < 0.01])
+```
+
+13 significant values under alpha = 0.01
+
+It tells us that there might be some false discoveries which results in number of discoveries different from more the theoretical significant variables.
+
+#### 6. Given the p values you find, use the BH procedure to control the FDR with a q of 0.1. How many "true" discoveries do you estimate?
+
+```{r}
+### adjust p-values using p.adjust with method = Benjamini & Hochberg
+new_p_values = p.adjust(p_value_vector, 
+             method = "BH")
+
+### try to get dataframe with p_values < 0.1
+as.data.frame(new_p_values) %>% filter(new_p_values<0.1)
+```
+
+As none of the adjusted p-values are smaller than 0.1, we conclude that there is 0 true discovery being estimated.
+
+#### 7.Explore the "autos.csv" data. Include any metrics and / or plots you find interesting.
+
+```{r}
+### read data from csv
+auto <- read.csv("autos.csv")
+
+### print the column names
+colnames(auto)
+```
+
+```{r}
+### regress price with everything else
+auto_regression_everything <- lm(price~. , data = auto)
+summary(lm(price~. , data = auto))
+```
+
+Scatter plot for lm(price ~ make)
+
+```{r}
+library(ggplot2)
+
+ggplot(auto , aes(x = make , y = price , color = make)) +
+  geom_point(size = 2 , alpha = 0.7) + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1) , 
+        plot.title = element_text(hjust = 0.5)) +
+  ggtitle("lm(price ~ make)")
+```
+
+test p-value of lm(price~make)
+
+```{r}
+summary(lm(price~make , data = auto))
+```
+
+scatter plot for lm(price ~ body_style)
+
+```{r}
+ggplot(auto , aes(x = body_style , y = price , color = body_style)) +
+  geom_point(size = 2 , alpha = 0.7) + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1) , 
+        plot.title = element_text(hjust = 0.5)) +
+  ggtitle("lm(price ~ body_style)")
+```
+
+test p-value of lm(price\~body_style)
+
+```{r}
+summary(lm(price~body_style , data = auto))
+```
+
+scatter plot for lm(price \~ drive_wheels)
+
+```{r}
+ggplot(auto , aes(x = drive_wheels , y = price , color = drive_wheels)) +
+  geom_point(size = 2 , alpha = 0.7) + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1) , 
+        plot.title = element_text(hjust = 0.5)) +
+  ggtitle("lm(price ~ drive_wheels)")
+```
+
+test p-value of lm(price\~drive_wheels)
+
+```{r}
+summary(lm(price~drive_wheels , data = auto))
+```
+
+test p-value of lm(price\~engine_type)
+
+```{r}
+summary(lm(price~engine_type , data = auto))
+```
+
+#### 8.Create a linear regression model to predict price. Explain your model.
+
+```{r}
+### getting all the p_values are significant
+auto_p_value <- summary(auto_regression_everything)$coefficient[,4]
+auto_p_value[auto_p_value < 0.01]
+```
+
+Combing with the individual tests performed on categorical data in the previous section following are the columns identified:
+
+1.  Make
+2.  Body_style
+3.  engine_location
+4.  wheel_base
+5.  curb_weight
+6.  engine_size
+7.  peak_rpm
+8.  drive wheels
+
+Linear model
+
+```{r}
+auto_model <- lm(price ~ make + body_style + engine_location + wheel_base + curb_weight +
+                   engine_size + peak_rpm + drive_wheels , data = auto)
+
+summary(auto_model)
+```
+
+#### 9. Why might false discoveries be an issue?
+
+Because there are some times where we have to be especially careful about the variables we choose to put into the model and sometimes it's very costly to gather all the data, and any additional redundant variable can become a big burden.
+
+#### 10. Use the BH procedure to control the FDR with a q of 0.1. How many true discoveries do you estimate? Plot the cutoff line together with the significant and insignificant p-values.
+
+```{r}
+library(sgof)
+
+auto_model_p_values <- as.vector(summary(auto_model)$coefficient[2:nrow(summary(auto_model)$coefficient),4])
+res <- BH(auto_model_p_values , alpha = 0.1)
+
+res$Rejections
+```
+
+11 true discoveries
+
+```{r}
+### Turn p-values into dataframe
+auto_p_value_df <- as.data.frame(summary(auto_model)$coefficient[,4])
+### rename column 
+colnames(auto_p_value_df) <- "p-value"
+
+### sort dataframe
+sorted_auto_df <- auto_p_value_df[order(auto_p_value_df$'p-value') ,, drop = FALSE]
+
+### extract left 11 varaibles + coefficient
+top_11_df <- head(sorted_auto_df , 12)
+
+###Final model
+top_11_df
+```
+
+plot cutoff line
+
+```{r}
+
+fdr <- function(pvals, q, plotit=TRUE){
+  pvals <- pvals[!is.na(pvals)]
+  N <- length(pvals)
+  
+  k <- rank(pvals, ties.method="min")
+  alpha <- max(pvals[ pvals <= (q*k/N) ])
+  
+  if(plotit){
+    sig <- factor(pvals <= alpha)
+    o <- order(pvals)
+    plot(pvals[o], log="xy", col=c("grey60","red")[sig[o]], pch=20, 
+      ylab="p-values", xlab="tests ordered by p-value", main = paste('FDR =',q))
+    lines(1:N, q*(1:N) / N)
+  }
+  
+  return(alpha)
+}
+
+fdr(auto_model_p_values , 0.1)
+
+```
