@@ -1,0 +1,169 @@
+---
+title: "assignment3_Ian_Hwang"
+output: html_document
+date: "2023-01-26"
+---
+```{r}
+library("dplyr")
+library("glmnet")
+library("caret")
+library("caret")
+library("imputeTS")
+library("tidyverse")
+library("glmnet")
+```
+## 1. [20 points] For the above dataset (Dependent variable: heart_attack)
+
+
+### 1.How would you choose a sample subset (such as missing value, nulls, empty columns) of this dataset? What criteria would you consider when selecting a training subset from the above dataset (such as balanced distribution between training and test for the treated observations) ?
+
+```{r}
+heart <- read.csv("heart.csv")
+```
+
+To start with, I will check if there are too many NAs in the columns, normally, we can accept 25-30% of missing values, but it depends on the context of the analysis, we may be able to accept either higher or lower percentage of missing values.
+
+About the balance between training and testing data sets. For training data set, we have to make sure that it's large enough so that the information is more toward to be general so that it's more likely for us to receive a less biased model. Normally, the testing data set is 20%-30% of the whole data set.
+
+
+### 2.Randomly split the dataset into test and training sets using 80% observations as training set. Fit a simple linear regression model (full model) to predict the heart attack probability and test your model against the test set.  Explain your model and obtain the R^2 for the predictions of the test data set (i.e., a true OOS R^2).
+
+```{r}
+### find columns with missing values over 30%
+heart_less_na <- colMeans(is.na(heart))
+heart_less_na <- heart_less_na[heart_less_na < .3]
+h_name <- names(heart_less_na)
+
+### subsetting heart with NA value benchmark(30%)
+new_heart <- heart[,h_name]
+
+### fill NA values with mean
+new_heart <- na_mean(new_heart)
+
+### split dataframe
+### set random seed for us to replicate same result
+set.seed(1)
+
+### create true false randomly with 80-20% ratio
+split <- sample(c(TRUE , FALSE) , nrow(new_heart) , replace = TRUE , prob = c(0.8 , 0.2))
+train_data <- new_heart[split , ]
+test_data <- new_heart[!split , ]
+
+### create model
+heart_model <- glm(heart_attack ~ . , data = train_data)
+summary(heart_model)
+```
+
+
+```{r}
+### out of sample test
+OOS <- predict(heart_model , newdata = test_data , type = 'response')
+actual_y <- test_data$heart_attack
+
+### calculate OOS R square
+R2 <- 1 - sum((actual_y - OOS) ^ 2) / sum((actual_y - mean(actual_y)) ^ 2)
+R2
+```
+
+The model is using 16 variables as input, variables height, fat_free_wt, neck_dim, chest_dim, abdom_dim are the most significant ones. OOS R square = 0.96, it means that the model is explaining 96% of the variance of the dependent variable is explained by the independent variables in the regression model.
+
+
+## 2. [10 points] Explain cross-validation and highlight the problems that may be associated with a cross-validation approach.
+
+Cross-validation is a technique for evaluating ML models by training several ML models on subsets of the available input data and evaluating them on the complementary subset of the data. Use cross-validation to detect overfitting, ie, failing to generalize a pattern.
+
+
+**Problem with cross-validation**
+
+The disadvantage of this method is that the training algorithm has to be rerun from scratch k times, which means it takes k times as much computation to make an evaluation.
+
+
+## 3. Use only the training sets from question 1 and estimate an 8-fold cross-validation to estimate the R^2 of the full model. e., use cross-validation to train (on 7/8 of the training set) and evaluate (on 1/8 of the training set).  Calculate the mean R^2 from the 8-fold cross-validation and compare it with the R^2 from question 1.  Please explain your observation.
+
+```{r}
+train_control <- trainControl(method = "cv",
+                              number = 8)
+
+model_8folds <- train(heart_attack ~ .,data = train_data, method = "glm", trControl = train_control)
+
+summary(model_8folds)
+```
+
+```{r}
+print(model_8folds)
+```
+
+The R square of the 8 folded model is 0.88508, which is slightly lower than the one we get from the previous model(0.9632).
+
+The R square we get from the first question, we only test one set of combination of train and test example, additionally the size of the data set is also not very big, with these premises, the OOS R square we calculcate may not be able to reflect the real situation. However, for the cross validation R square, we basically repeat the previous step 8 times, which provides much better generalization, therefore, it's very possible that the actual predictability is closer to 0.84, which is the R square we calculated from cross validation.
+
+
+## 4.[10 points] Explain Lasso regression and how does it work. List the pros and cons associated with using it.
+
+LASSO is a penalized regression method to improve OLS and Ridge regression. LASSO does shrinkage and variable selection simultaneously for better prediction and model interpretation
+
+The biggest pro of LASSO is that it is better than the usual methods of automatic variable selection such as forward, backward and stepwise - all of which can be shown to give wrong results. The results from LASSO are much better.
+
+The biggest con of LASSO is that it is automatic; therefore, it has problems. The biggest problem is that it lets you (the data analyst) avoid thinking. Other, lesser problems:
+
+## 5.[25 points] Use again the training sets from question 1 and
+
+1.Fit a Lasso regression to predict the heart attack probability. Use cross-validation to obtain lambda_min as well as lambda_1se Explain the two resulting models. Which one would you choose?
+
+```{r}
+set.seed(1)
+x <- data.matrix(train_data[,-17])
+y <- train_data$heart_attack
+
+fit <- cv.glmnet(x , y)
+
+lambda_min <- fit$lambda.min
+lambda_min
+```
+
+```{r}
+lambda_1se <- fit$lambda.1se
+lambda_1se
+```
+
+```{r}
+plot(fit)
+```
+Lambda_min is smaller than Lambda_1se (0.5063622 < 0.8062718), the reason for this is that lambda_min is the value of λ that gives minimum mean cross-validated error, while lambda_1se is the value of λ that gives the most regularized model such that the cross-validated error is within one standard error of the minimum, which indicates that lambda_min is always going to be smaller than lambda_1se. I'll choose lambda_1se, given that it's more general.
+
+
+2.Compare model outputs from questions one, three, and five.
+```{r}
+test_x <- test_data[,-17]
+test_y <- test_data$heart_attack
+### model 5
+
+
+### model 1 OOS R-square
+R2
+
+### model 3 OOS R square
+m3_R2 <- 0.8508
+m3_R2
+
+# find out the model with 1se lambda
+model_5 <- glmnet(x , y , lambda = lambda_1se)
+y_1se <- predict(model_5 , s = lambda_1se , newx = data.matrix(test_x))
+m5_R2 <- 1 - sum((actual_y - y_1se) ^ 2) / sum((actual_y - mean(actual_y)) ^ 2)
+m5_R2
+
+```
+For the first model has the highest r-square of 0.9632. The second model with 8 folds cross validation holds the r-square of 0.8508, and for the last model which is the lambda_1se model, the r_square is 0.8745. I will choose the lamdba_1se model, even though it doesn't have the highest r-suare, the selection process make sure the variables being included in the model are important enough, which makes the model more reliable.
+
+
+## 6.[10 points] What is AIC, and how is it calculated? When to use AICc (corrected AIC)?
+
+The Akaike information criterion (AIC) is a mathematical method for evaluating how well a model fits the data it was generated from.
+
+AIC determines the relative information value of the model using the maximum likelihood estimate and the number of parameters (independent variables) in the model. The formula for AIC is:
+
+$AIC = 2K - 2ln(L)$
+
+K is the number of independent variables used and L is the log-likelihood estimate (a.k.a. the likelihood that the model could have produced your observed y-values).
+
+We use AICc when the ratio between the sample size n and the number of parameters p in the largest candidate model is small(<40).
