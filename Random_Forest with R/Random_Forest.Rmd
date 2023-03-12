@@ -1,0 +1,191 @@
+---
+title: "Assignment 6"
+output: html_document
+date: "2023-02-23"
+---
+
+## 1. PCA (Principal Component Analysis) is an unsupervised ML method that is often used to reduce dimensionality of large data sets.
+
+### 1.Please explain how PCA can be used to reduce the number of variables.
+
+**Answer** : PCA can be used to reduce the number of variables by transforming the original data set into a new set of vairables. These new set of variables are linear combinations of the orginal varaibles and are selected in a way that maximizes the amount of variance explained in the data. We can then decide what percentage of variance we want the input data to contain, and discard the rest of the variables once the benchmark is hit.
+
+
+### 2.Please highlight limitations of PCA.
+
+
+1. Linearity assumption: PCA assumes that the relationships between variables are linear. If the relationships are nonlinear, PCA may not capture all the important patterns in the data.
+
+2. Orthogonality assumption: PCA assumes that the principal components are orthogonal (uncorrelated) to each other. However, in some datasets, the principal components may be correlated, which can make it difficult to interpret the results.
+
+
+3. Sensitivity to outliers: PCA is sensitive to outliers, which can have a strong influence on the position of the principal components. In some cases, outliers can lead to misleading results.
+
+
+4.Interpretability: While PCA can identify the most important patterns in the data, it can be difficult to interpret the results in terms of the original variables. In some cases, the principal components may be difficult to explain or may not have any clear meaning.
+
+
+5.Information loss: PCA involves reducing the dimensionality of the data, which can lead to information loss. In some cases, important patterns or relationships in the data may be lost in the process.
+
+
+## 2. Trees are supervised algorithms that can be used for both regression and classification tasks. For the following trees, please explain how it is grown (i.e., how to select the variables to split on at each node)
+
+
+### 1. Classification Tree 
+
+1. Select the initial variable: The first step is to select the variable that will be used to split the dataset at the root node of the tree. There are several methods for selecting the initial variable, but the most common is to choose the variable that has the highest information gain or the lowest Gini index.
+
+
+2. Evaluate the split: Once the initial variable is selected, the dataset is split into two or more subsets based on the values of the selected variable. The quality of the split is evaluated using a metric such as information gain or Gini index, which measures how well the split separates the different classes.
+
+
+3. Select the next variable: The next variable to split on is selected by repeating the process of evaluating the quality of the split for each variable and selecting the variable with the highest information gain or lowest Gini index.
+
+
+4. Repeat until stopping criteria are met: The process of selecting variables and evaluating splits is repeated recursively for each subset of the data until a stopping criteria are met. Stopping criteria could include reaching a maximum depth of the tree, a minimum number of samples in a node, or reaching a minimum level of purity.
+
+
+### 2. Regression Tree
+
+1. Select the initial variable: The first step is to select the variable that will be used to split the dataset at the root node of the tree. For regression problems, the most common approach is to choose the variable that minimizes the sum of squared errors (SSE) between the predicted values and the actual values of the target variable.
+
+
+2. Evaluate the split: Once the initial variable is selected, the dataset is split into two or more subsets based on the values of the selected variable. The quality of the split is evaluated using a metric such as SSE, which measures the difference between the predicted values and the actual values of the target variable.
+
+
+3. Select the next variable: The next variable to split on is selected by repeating the process of evaluating the quality of the split for each variable and selecting the variable that minimizes the SSE.
+
+
+4. Repeat until stopping criteria are met: The process of selecting variables and evaluating splits is repeated recursively for each subset of the data until a stopping criteria are met. Stopping criteria could include reaching a maximum depth of the tree, a minimum number of samples in a node, or reaching a minimum level of SSE reduction.
+
+
+## 3. Please explain how a tree is pruned?
+
+There are two different types of prunings, pre-pruning and post-pruning:
+
+1. Pre-pruning: Pre-pruning involves setting a stopping criterion that prevents the tree from growing beyond a certain point. For example, the algorithm may stop growing the tree when the number of samples in a leaf node falls below a certain threshold, or when the maximum depth of the tree is reached. Pre-pruning can be effective in reducing overfitting, but it may also result in underfitting if the tree is not allowed to grow to its full potential.
+
+
+2.Post-pruning: Post-pruning involves growing the tree to its full size and then removing branches that do not improve the performance of the model on a validation set. The basic idea is to remove branches that do not contribute to the reduction in error on the validation set, while keeping the overall structure of the tree intact. One common approach to post-pruning is to use a technique called cost complexity pruning, which involves adding a penalty term to the cost function that measures the complexity of the tree.
+
+
+## 4. Please explain why a Random Forest usually outperforms regular regression methods (such as linear regression, logistic regression, and lasso regression).
+
+1. Non-linearity: Many real-world datasets have complex, non-linear relationships between the input features and the output variable. Linear regression, logistic regression, and lasso regression all assume a linear relationship between the input features and the output variable. Random Forest, on the other hand, can capture non-linear relationships between the features and the output variable by using decision trees that can capture non-linear interactions between features.
+
+
+2. Overfitting: Regular regression methods are prone to overfitting, especially when the number of input features is high. Random Forest can avoid overfitting by using multiple decision trees and combining their predictions, which helps to reduce the variance of the model.
+
+
+3. Handling missing values: Random Forest can handle missing values in the data, while regular regression methods may require imputation or removal of missing values.
+
+
+4. Feature importance: Random Forest provides a measure of feature importance, which can help identify the most important features in the data that are driving the predictions. This can be useful in feature selection and feature engineering.
+
+
+5. Robustness to outliers: Random Forest is robust to outliers in the data, as each decision tree is trained on a random subset of the data, which reduces the influence of outliers.
+
+
+## 5. Use the Trasaction.csv dataset to create payment default classifier ('payment_default ' column) and explain your output using:
+
+### 1. Classification Tree (CART)
+```{r}
+### read transaction data
+transaction <- read.csv("Transaction.csv")
+```
+
+
+```{r}
+### For decision tree model
+library(rpart)
+### For data visualization
+library(rpart.plot)
+library(randomForest)
+library(caTools)  
+```
+
+```{r}
+### remove index
+transac <- transaction[, -1]
+
+### handle NA values
+transac <- na.omit(transac)
+
+### convert predicted value to factor
+transac$payment_default <- as.factor(transac$payment_default)
+
+
+### split data set
+set.seed(123)
+split <- sample.split(transac , SplitRatio = 0.7)
+train <- subset(transac, split == "TRUE")
+test <- subset(transac, split == "FALSE")
+
+cart <- rpart(payment_default~. , data = train , method = "class" , cp = 0.004)
+
+cart
+```
+
+```{r}
+cart_predict <- predict(cart , newdata = test[,-24] , type = 'class')
+cart_accuracy <- mean(cart_predict == test$payment_default) * 100
+
+cat('Accuracy on testing data: ', round(cart_accuracy, 2), '%',  sep='')
+```
+
+
+```{r}
+rpart.plot(cart)
+```
+
+**Interpretation:** Individual with pay_0 < 2 are less possible to default, for those with pay_0 >=2, if "pay_3" < 0, they are also less possible to default; on the other hand, for those with "pay_3" >= 0, they are likely to default in the future.
+
+
+
+### 2. Random Forest
+
+```{r}
+### set random seed
+set.seed(123)
+
+forest <- randomForest(x = train[-24],
+                       y = train$payment_default,
+                       type = "classification",
+                       ntree = 500)
+
+### check trained model
+forest
+```
+```{r}
+### Predicting the Test set results
+y_pred = predict(forest, newdata = test[-24])
+
+### create confusion matrix
+confusion_mtx = table(test[, 24], y_pred)
+confusion_mtx
+
+```
+
+```{r}
+# Plotting model
+plot(forest)
+```
+
+```{r}
+### Accuracy
+accuracy <- mean(y_pred == test$payment_default) * 100
+cat('Accuracy on testing data: ', round(accuracy, 2), '%',  sep = '')
+```
+
+Generally speaking, random forest is more likely to yield better prediction accuracy comparing to a single tree, in this case the previous CART model. However, from the model accuracies we know that our CART model performed better than our random forest model, this can be due to a few reasons:\
+1. data imbalanced\
+2. tuning of CART model : (Since we adjust the "cp" value manually, it could be by chance that the cp value we designated fitted the OOS data best)\
+
+
+
+
+
+
+
+
+
